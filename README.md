@@ -1,4 +1,4 @@
-# 灵感便签（@local/inspirations）
+# 灵感便签（dsh-inspirations）
 
 DSH 左侧栏里的一面便签墙：点左侧导航的「灵感」进入主页面，随手记下灵感，勾选若干条，直接和 AI 讨论。
 
@@ -42,23 +42,25 @@ inspirations/
 
 模型路由三级回落：活体 agent 的 `options` → 会话日志里最新的 `request/header` → `agentDefaultModel` 全局默认。所以在一个还没发过消息的新会话里也能讨论（走默认模型）。
 
-## 安装到档案
+## 安装
 
-推荐直接用 `plugin_manager install_bundle`，`target` 指向本目录：
+**从 GitHub 安装（推荐）**：
 
-```
-plugin_manager({ action: "install_bundle", target: "E:\\VScode\\插件\\inspirations" })
-```
-
-它会把 `link:` 依赖写进档案 `package.json` 并加入 `dsh.profile.bundles`。已经装过同一包名时先 `remove_bundle` 再装（否则会返回 `already-installed`）。手动方式等价于：
-
-```jsonc
-// <profile>/package.json
-"dependencies": { "@local/inspirations": "link:E:/VScode/插件/inspirations" },
-"dsh": { "profile": { "bundles": [ /* … */ "@local/inspirations" ] } }
+```sh
+dsh plugin add github:chaquchi/dsh-inspirations
 ```
 
-然后在该档案目录 `pnpm install`，重启 DSH。`cordis.patch.yml` 会向档案 insert 一行 `id: inspirations`。
+桌面端也可以打开 **插件 → 发现 / 插件市场**，搜索 `dsh-inspirations` 一键安装（收录社区后可见）。
+
+**本地开发安装**：直接用 `plugin_manager install_bundle`，`target` 指向本目录：
+
+```
+plugin_manager({ action: "install_bundle", target: "<本仓库目录>" })
+```
+
+它会把 `link:` 依赖写进档案 `package.json` 并加入 `dsh.profile.bundles`。已经装过同一包名时先 `remove_bundle` 再装（否则会返回 `already-installed`）。`cordis.patch.yml` 会向档案 insert 一行 `id: inspirations`。
+
+笔记保存在 `$DSH_HOME/inspirations/notes.json`（默认 `C:\Users\<你>\.dsh\inspirations\notes.json`），升级或重装插件不会动这份数据。
 
 ## 开发约束（踩过的坑）
 

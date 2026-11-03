@@ -1,5 +1,5 @@
 {
-  "name": "@local/inspirations",
+  "name": "dsh-inspirations",
   "version": "0.5.0",
   "description": "灵感便签：DSH 左侧栏里的一面便签墙，横向麻绳挂起 4:3 便签，点开按纸色编辑，可多选或单条和 AI 讨论。",
   "type": "module",
@@ -36,5 +36,14 @@
     "sidebar-panel",
     "sticky-notes",
     "inspiration"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chaquchi/dsh-inspirations.git"
+  },
+  "homepage": "https://github.com/chaquchi/dsh-inspirations",
+  "bugs": {
+    "url": "https://github.com/chaquchi/dsh-inspirations/issues"
+  },
+  "author": "biao"
 }
