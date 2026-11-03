@@ -12,7 +12,7 @@ import { join } from 'node:path'
 const home = await mkdtemp(join(tmpdir(), 'inspirations-test-'))
 process.env.DSH_HOME = home
 
-const { apply } = await import('../lib/index.js')
+const { apply, closeStore } = await import('../lib/index.js')
 
 function fakeRequest(url, body) {
   return {
@@ -108,6 +108,7 @@ async function call(method, body) {
 // 空库
 const initial = await call('notes.list')
 assert.deepEqual(initial.notes, [])
+assert.equal(initial.engine, 'sqlite', 'shipped runtime uses SQLite storage')
 assert.ok(initial.path.includes('inspirations'), 'store path is namespaced under DSH_HOME')
 
 // 新建
@@ -193,5 +194,6 @@ const promptText = sent.messages[0].content[0].text
 assert.ok(promptText.includes('改过的正文'), 'selected note body travels with the request')
 assert.ok(promptText.includes('可行吗'), 'conversation history travels with the request')
 
+await closeStore()
 await rm(home, { recursive: true, force: true })
 console.log('host tests passed')

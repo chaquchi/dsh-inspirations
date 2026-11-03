@@ -3,7 +3,7 @@
 DSH 左侧栏里的一面便签墙：点左侧导航的「灵感」进入主页面，随手记下灵感，勾选若干条，直接和 AI 讨论。
 
 - **形态**：左侧导航行（`sidebar.panellist`，id `inspirations`）+ 同一 id 的主栏页面（`main`），不再依赖 `dsh-better-sidebar`。
-- **存储**：全局一份 `$DSH_HOME/inspirations/notes.json`（默认 `C:\Users\<你>\.dsh\inspirations\notes.json`），跨会话、跨工作区共享；桌面端与网页端看到的是同一份。
+- **存储**：全局一份 SQLite 数据库 `$DSH_HOME/inspirations/inspirations.db`（默认 `C:\Users\<你>\.dsh\inspirations\inspirations.db`），内置 `node:sqlite`、WAL 模式；从 0.6.4 起由旧的 `notes.json` 自动迁移（迁移后原文件改名为 `notes.json.imported-<时间戳>.bak` 保留备份）。跨会话、跨工作区共享；桌面端与网页端看到的是同一份。
 - **讨论**：点「讨论 N」把勾选的灵感连同对话历史一起发给当前会话正在使用的模型；没勾选时点它会提示先勾选。点开任意一张便签，编辑器右上角也有「讨论」，直接把这一条带进讨论。回答里可以一键「存为新灵感」。讨论不占用主对话上下文。
 - **标题与复制**：标题独立于正文（`title` + `titleAuto`）：留空时自动取正文第一行，手写后固定、不再被正文覆盖，清空又回到自动。卡片悬停右上角、编辑器底部都有「复制」，复制纯文本（手写标题会带上标题行）。
 
@@ -24,9 +24,10 @@ DSH 左侧栏里的一面便签墙：点左侧导航的「灵感」进入主页�
 inspirations/
 ├── package.json         # dsh.bundle.patch + dsh.client（platform: web）
 ├── cordis.patch.yml     # 向档案 insert 一行宿主插件
-├── lib/index.js         # 宿主端：笔记存储 + POST /inspirations/api/*
+├── lib/index.js         # 宿主端：SQLite 存储 + POST /inspirations/api/*
 ├── lib/client.js        # 客户端：注册左侧导航行（sidebar.panellist）+ 主栏便签墙（main）
 ├── tests/host.test.mjs  # 宿主端回归测试（假 ctx 驱动路由）
+├── tests/storage.test.mjs # 存储层测试（建库、迁移、软删除、重启恢复）
 └── README.md
 ```
 
@@ -36,13 +37,22 @@ inspirations/
 
 | method | 入参 | 说明 |
 | --- | --- | --- |
-| `notes.list` | – | 全部笔记（置顶优先、按更新时间倒序）+ 存储路径 |
+| `notes.list` | – | 全部笔记（置顶优先、按更新时间倒序）+ `path` 与 `engine`（`sqlite` / `json`） |
 | `notes.save` | `{ id?, text, title?, titleAuto?, pinned? }` | 无 `id` 新建，有 `id` 更新；`title` 手写标题，`titleAuto:false` 固定标题，`titleAuto:true` 或留空标题时按正文首行推导；文本和标题都为空才拒绝；返回 `{ note, notes }` |
-| `notes.remove` | `{ id }` | 删除；返回剩余 `notes` |
+| `notes.remove` | `{ id }` | 软删除（`deleted_at` 置位，行保留可追溯）；返回剩余 `notes` |
 | `route.info` | `{ sessionId }` | 当前会话的 `{ provider, model, source }` |
 | `discuss` | `{ sessionId, notes: string[], messages }` | 一次讨论轮次，返回 `{ reply, route, elapsedMs }` |
 
 模型路由三级回落：活体 agent 的 `options` → 会话日志里最新的 `request/header` → `agentDefaultModel` 全局默认。所以在一个还没发过消息的新会话里也能讨论（走默认模型）。
+
+## 存储（0.6.4 起：SQLite）
+
+- **引擎**：宿主进程内置 `node:sqlite`（DSH 桌面自带 Node 24.21 / SQLite 3.53.4），库文件 `$DSH_HOME/inspirations/inspirations.db`；`journal_mode=WAL`、`synchronous=NORMAL`、`busy_timeout=2000`。
+- **schema v1**（版本号存 `meta.schema_version`）：`notes(id, text, title, title_auto, pinned, created_at, updated_at, deleted_at)`，索引 `notes_live(deleted_at, pinned DESC, updated_at DESC)`；`relations` 表为 0.7 的灵感关系分析预留（`a_id / b_id / kind / reason / confidence / analyzed_at / model / prompt_version`，唯一键 `(a_id, b_id, kind)`）。
+- **迁移**：首次打开且发现旧的 `notes.json` 时自动导入（`titleAuto` 等字段按老数据规则补齐），成功后把原文件改名为 `notes.json.imported-<时间戳>.bak`；`meta.legacy_json_imported` 记录后不再重复导入。
+- **软删除**：`notes.remove` 只写 `deleted_at`，列表过滤但不物理删除，方便以后做回收站；同一 id 再次保存会复活该行。
+- **回退**：运行环境没有 `node:sqlite`（老 Node）时自动降级回单文件 JSON，接口与字段不变，只是 `notes.list` 的 `engine` 变成 `json`。
+- **并发**：宿主进程内是同步 API，天然串行；多窗口共享同一连接；跨进程靠 WAL + `busy_timeout`，不会互相清空数据。
 
 ## 安装
 
@@ -62,7 +72,7 @@ plugin_manager({ action: "install_bundle", target: "<本仓库目录>" })
 
 它会把 `link:` 依赖写进档案 `package.json` 并加入 `dsh.profile.bundles`。已经装过同一包名时先 `remove_bundle` 再装（否则会返回 `already-installed`）。`cordis.patch.yml` 会向档案 insert 一行 `id: inspirations`。
 
-笔记保存在 `$DSH_HOME/inspirations/notes.json`（默认 `C:\Users\<你>\.dsh\inspirations\notes.json`），升级或重装插件不会动这份数据。
+笔记保存在 `$DSH_HOME/inspirations/inspirations.db`（默认 `C:\Users\<你>\.dsh\inspirations\inspirations.db`），升级或重装插件不会动这份数据；旧的 `notes.json` 会在首次启动时自动迁移并留备份。
 
 ## 开发约束（踩过的坑）
 
@@ -72,6 +82,7 @@ plugin_manager({ action: "install_bundle", target: "<本仓库目录>" })
 - **客户端不要 `require()` 任何 `@deepseek-ai/dsh-client-*`**：client 模块表对第三方插件的 value-import 有纯度门。图标自绘 SVG。
 - **宿主端不要 import `@deepseek-ai/dsh-llm`**：第三方插件从档案 `node_modules` 解析，官方包不保证可见；服务一律 `ctx.get()` 读取并降级，chunk 自行累积（`text-delta` → `chunk.text`）。
 - **路由前缀必须唯一**：`/inspirations/api`。
+- **存储只用内置 `node:sqlite`**：不要引 `better-sqlite3` 之类的原生模块（Electron ABI 与重装编译都麻烦）；schema 变更走 `meta.schema_version` 迁移，别在 `SCHEMA_V1` 之外手改老库。
 - 笔记目录放在 `$DSH_HOME` 下而非工作区：灵感是全局的，且要能跨工作区读取。
 
 ## 视觉与动效规范（v11：满幅便签墙 + 叠纸编辑 + 图钉固定的下垂麻绳）
