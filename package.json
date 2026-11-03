@@ -1,7 +1,7 @@
 {
   "name": "dsh-inspirations",
-  "version": "0.6.2",
-  "description": "灵感便签：DSH 左侧栏里的一面满幅便签墙，手写字体、6 色便签与叠纸编辑，麻绳有体积和入场动效，可复制、可和 AI 讨论。",
+  "version": "0.6.3",
+  "description": "灵感便签：DSH 左侧栏里的一面满幅便签墙，手写字体、6 色便签与叠纸编辑；麻绳两端用图钉固定，夹子上半部挂绳、夹子之间自然下垂。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
