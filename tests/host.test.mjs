@@ -122,6 +122,22 @@ const updated = await call('notes.save', { id, text: '灵感一\n改过的正文
 assert.equal(updated.note.text, '灵感一\n改过的正文')
 assert.equal(updated.notes.length, 1)
 
+// 手写标题：titleAuto=false 后标题固定，不随正文变化
+const manual = await call('notes.save', { id, text: '这是正文\n第二行', title: '手写标题', titleAuto: false })
+assert.equal(manual.note.title, '手写标题')
+assert.equal(manual.note.titleAuto, false)
+const renamed = await call('notes.save', { id, text: '正文改了' })
+assert.equal(renamed.note.title, '手写标题', '手写标题不会被正文覆盖')
+// 清空标题回到自动模式：标题重新取正文第一行
+const autoAgain = await call('notes.save', { id, text: '新的第一行\n正文', title: '', titleAuto: true })
+assert.equal(autoAgain.note.title, '新的第一行')
+assert.equal(autoAgain.note.titleAuto, true)
+// 只有标题、没有正文也允许保存
+const titleOnly = await call('notes.save', { text: '', title: '只有标题', titleAuto: false })
+assert.equal(titleOnly.ok, true)
+assert.equal(titleOnly.note.title, '只有标题')
+await call('notes.remove', { id: titleOnly.note.id })
+
 // 置顶排序
 const second = await call('notes.save', { text: '第二条' })
 const pinned = await call('notes.save', { id: second.note.id, text: '第二条', pinned: true })
