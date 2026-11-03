@@ -1,0 +1,5 @@
+# @local/inspirations bundle patch：向档案追加一个宿主行。
+# 行名从档案自身的 node_modules 解析（安装到 profile 后生效）。
+- insert:
+    - id: inspirations
+      name: '@local/inspirations'
